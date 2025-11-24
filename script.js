@@ -194,41 +194,16 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 });
 // Load movies from localStorage or use default
-let movies = JSON.parse(localStorage.getItem('movies')) || [
-    {
-        id: 1,
-        name: "Action Thriller",
-        poster: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&h=600&fit=crop",
-        date: "2024-12-25",
-        time: "18:00",
-        phone: "+91 6382881324"
-    },
-    {
-        id: 2,
-        name: "Sci-Fi Adventure",
-        poster: "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400&h=600&fit=crop",
-        date: "2024-12-26",
-        time: "19:00",
-        phone: "+91 6382881324"
-    },
-    {
-        id: 3,
-        name: "Drama Masterpiece",
-        poster: "https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&h=600&fit=crop",
-        date: "2024-12-27",
-        time: "20:00",
-        phone: "+91 6382881324"
-    }
-];
+let movies = []; // Movies will now be synced from Firestore
 
-// Save movies to localStorage
-function saveMovies() {
-    localStorage.setItem('movies', JSON.stringify(movies));
-    // Update phone display if movies exist
-    if (movies.length > 0) {
-        updateTheatrePhone();
-    }
-}
+// Save movies to localStorage - No longer needed, as movies will be synced with Firestore
+// function saveMovies() {
+//     localStorage.setItem('movies', JSON.stringify(movies));
+//     // Update phone display if movies exist
+//     if (movies.length > 0) {
+//         updateTheatrePhone();
+//     }
+// }
 
 // Storage for bookings
 let bookings = JSON.parse(localStorage.getItem('bookings')) || [];
@@ -268,37 +243,34 @@ function initEmailJS() {
 document.addEventListener('DOMContentLoaded', function() {
     console.time('DOMContentLoaded_total');
     // Save movies if not in localStorage
-    if (!localStorage.getItem('movies')) {
-        console.time('DOMContentLoaded_saveMovies');
-        saveMovies();
-        console.timeEnd('DOMContentLoaded_saveMovies');
-    }
+    // The movies array will now be populated by Firestore listener
     
     // Initialize EmailJS
     console.time('DOMContentLoaded_initEmailJS');
     initEmailJS();
     console.timeEnd('DOMContentLoaded_initEmailJS');
     
-    console.time('DOMContentLoaded_loadMovies');
-    loadMovies();
-    console.timeEnd('DOMContentLoaded_loadMovies');
-    
+    // Setup event listeners for static elements
     console.time('DOMContentLoaded_setupEventListeners');
     setupEventListeners();
     console.timeEnd('DOMContentLoaded_setupEventListeners');
     
-    console.time('DOMContentLoaded_updateAdminStats');
-    updateAdminStats();
-    console.timeEnd('DOMContentLoaded_updateAdminStats');
-    
-    console.time('DOMContentLoaded_loadAdminMovies');
-    loadAdminMovies();
-    console.timeEnd('DOMContentLoaded_loadAdminMovies');
-    
-    // Attempt to initialize and enable Firebase sync if config exists
+    // Attempt to initialize Firebase and set up real-time syncs if config exists
     console.time('DOMContentLoaded_firebaseInitAndSync');
     if (initFirebaseIfConfigured()) {
         enableFirestoreSync();
+        // Set up real-time listener for movies collection
+        if (firestore) {
+            firestore.collection('movies').orderBy('name').onSnapshot(snapshot => {
+                movies = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                console.log('Movies updated from Firestore:', movies);
+                loadMovies();
+                loadAdminMovies();
+                updateTheatrePhone();
+            }, err => {
+                console.error('Firestore movies listener error', err);
+            });
+        }
     }
     console.timeEnd('DOMContentLoaded_firebaseInitAndSync');
     
@@ -327,18 +299,20 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     // Ensure 'guhan' exists and is a super admin (safety in case localStorage was modified)
     try {
+        // This section for default admin 'guhan' will be removed or changed as Firebase Auth is used
+        // For now, it remains for legacy fallback, but won't create auth users automatically.
         const guhanUser = adminUsers.find(u => u.username === 'guhan');
         if (!guhanUser) {
-            adminUsers.unshift({ username: 'guhan', password: '143', isSuper: true });
-            saveAdminUsers();
-            console.log('Added default super admin: guhan');
+            // adminUsers.unshift({ username: 'guhan', password: '143', isSuper: true });
+            // saveAdminUsers(); // No longer needed for Firebase Auth
+            console.log('Default admin setup (guhan) skipped for Firebase Auth.');
         } else if (!guhanUser.isSuper) {
-            guhanUser.isSuper = true;
-            saveAdminUsers();
-            console.log('Ensured guhan is set as super admin');
+            // guhanUser.isSuper = true;
+            // saveAdminUsers(); // No longer needed for Firebase Auth
+            console.log('Default admin (guhan) role update skipped for Firebase Auth.');
         }
     } catch (err) {
-        console.warn('Error ensuring guhan super admin', err);
+        console.warn('Error ensuring guhan super admin (legacy)', err);
     }
     // Render current admin display if already logged in
     renderCurrentAdmin();
@@ -347,7 +321,7 @@ document.addEventListener('DOMContentLoaded', function() {
     console.timeEnd('DOMContentLoaded_total');
 });
 
-// Load movies
+// Load movies - now purely renders from the `movies` array populated by Firestore
 function loadMovies() {
     const moviesGrid = document.getElementById('moviesGrid');
     moviesGrid.innerHTML = '';
@@ -1776,10 +1750,10 @@ function updatePosterPreview() {
 }
 
 // Handle movie form submit
-function handleMovieSubmit(e) {
+async function handleMovieSubmit(e) {
     e.preventDefault();
     
-    const movieId = document.getElementById('addMovieId').value;
+    const movieId = document.getElementById('addMovieId').value; // This will be UID for Firestore
     const movieData = {
         name: document.getElementById('addMovieName').value,
         poster: document.getElementById('addMoviePoster').value,
@@ -1787,32 +1761,36 @@ function handleMovieSubmit(e) {
         time: document.getElementById('addMovieTime').value,
         phone: document.getElementById('addMoviePhone').value
     };
+
+    if (!firestore) {
+        alert('Firestore not initialized. Cannot save movie.');
+        return;
+    }
+
     // For new movies, ensure a poster has been uploaded (hidden field populated)
     if (!movieId && !movieData.poster) {
         alert('Please upload a JPG poster image for the movie.');
         return;
     }
-    
-    if (movieId) {
-        // Edit existing movie
-        const index = movies.findIndex(m => m.id == movieId);
-        if (index !== -1) {
-            movies[index] = { ...movies[index], ...movieData };
+
+    try {
+        if (movieId) {
+            // Edit existing movie in Firestore
+            await firestore.collection('movies').doc(movieId).update(movieData);
+            console.log('Movie updated in Firestore:', movieId, movieData);
+            alert('Movie updated successfully!');
+        } else {
+            // Add new movie to Firestore
+            const docRef = await firestore.collection('movies').add(movieData);
+            console.log('New movie added to Firestore with ID:', docRef.id, movieData);
+            alert('Movie added successfully!');
         }
-    } else {
-        // Add new movie
-        const newId = movies.length > 0 ? Math.max(...movies.map(m => m.id)) + 1 : 1;
-        movies.push({
-            id: newId,
-            ...movieData
-        });
+    } catch (error) {
+        console.error('Error saving movie to Firestore:', error);
+        alert('Failed to save movie. See console for details and ensure Firestore rules allow writes.');
     }
     
-    saveMovies();
-    loadMovies();
-    loadAdminMovies();
     resetMovieForm();
-    alert(movieId ? 'Movie updated successfully!' : 'Movie added successfully!');
 }
 
 // Edit movie
@@ -1837,13 +1815,23 @@ function editMovie(id) {
 }
 
 // Delete movie
-function deleteMovie(id) {
-    if (confirm('Are you sure you want to delete this movie? This action cannot be undone.')) {
-        movies = movies.filter(m => m.id !== id);
-        saveMovies();
-        loadMovies();
-        loadAdminMovies();
+async function deleteMovie(id) {
+    if (!confirm('Are you sure you want to delete this movie? This action cannot be undone and will delete it from Firestore.')) {
+        return;
+    }
+
+    if (!firestore) {
+        alert('Firestore not initialized. Cannot delete movie.');
+        return;
+    }
+
+    try {
+        await firestore.collection('movies').doc(id).delete();
+        console.log('Movie deleted from Firestore with ID:', id);
         alert('Movie deleted successfully!');
+    } catch (error) {
+        console.error('Error deleting movie from Firestore:', error);
+        alert('Failed to delete movie. See console for details and ensure Firestore rules allow deletes.');
     }
 }
 
