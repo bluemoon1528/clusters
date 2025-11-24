@@ -42,9 +42,39 @@ function saveFirebaseConfigFromInput() {
 function initFirebaseIfConfigured() {
     if (firebaseApp || typeof firebase === 'undefined') return false;
     const cfgRaw = localStorage.getItem('firebaseConfig');
-    if (!cfgRaw) return false;
+    let cfg;
+    if (cfgRaw) {
+        try {
+            cfg = JSON.parse(cfgRaw);
+        } catch (err) {
+            console.error('Invalid Firebase config in localStorage', err);
+            // Fallback to default if stored config is invalid
+            cfg = {
+              "apiKey": "AIzaSyBJ3j0XvrpzYco3S5GxkK4Bay_InBz6iGk",
+              "authDomain": "cluster-50427.firebaseapp.com",
+              "projectId": "cluster-50427",
+              "storageBucket": "cluster-50427.firebasestorage.app",
+              "messagingSenderId": "82598015398",
+              "appId": "1:82598015398:web:538499cf491d4ab5445f67",
+              "measurementId": "G-EPMFPJQNGZ"
+            };
+        }
+    } else {
+        // Use the provided config as default if nothing in localStorage
+        cfg = {
+          "apiKey": "AIzaSyBJ3j0XvrpzYco3S5GxkK4Bay_InBz6iGk",
+          "authDomain": "cluster-50427.firebaseapp.com",
+          "projectId": "cluster-50427",
+          "storageBucket": "cluster-50427.firebasestorage.app",
+          "messagingSenderId": "82598015398",
+          "appId": "1:82598015398:web:538499cf491d4ab5445f67",
+          "measurementId": "G-EPMFPJQNGZ"
+        };
+    }
+
+    if (!cfg || !cfg.apiKey) return false; // Ensure a config object exists and has an API key
+
     try {
-        const cfg = JSON.parse(cfgRaw);
         firebaseApp = firebase.initializeApp(cfg);
         firestore = firebase.firestore(firebaseApp);
         auth = firebase.auth(firebaseApp);
