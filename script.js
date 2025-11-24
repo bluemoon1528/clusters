@@ -1,6 +1,7 @@
 // --- Firebase Firestore Real-Time Sync ---
 let firebaseApp = null;
 let firestore = null;
+let auth = null;
 let firestoreUnsubscribe = null;
 let firestoreSyncEnabled = false;
 
@@ -46,8 +47,10 @@ function initFirebaseIfConfigured() {
         const cfg = JSON.parse(cfgRaw);
         firebaseApp = firebase.initializeApp(cfg);
         firestore = firebase.firestore(firebaseApp);
+        auth = firebase.auth(firebaseApp);
         console.log("Firebase App initialized:", firebaseApp);
         console.log("Firestore initialized:", firestore);
+        console.log("Firebase Auth initialized:", auth);
         return true;
     } catch (err) {
         console.error('Failed to initialize Firebase', err);
@@ -204,9 +207,7 @@ let currentBooking = null;
 // Currently logged-in admin (set after successful admin login)
 let currentAdmin = null;
 // Admin users stored in localStorage. Default admin kept for compatibility.
-let adminUsers = JSON.parse(localStorage.getItem('adminUsers')) || [
-    { username: 'guhan', password: '143', isSuper: true }
-];
+let adminUsers = []; // Will now be managed by Firebase Auth
 
 // Default theatre QR and state
 const DEFAULT_QR = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=GPay:6382881324';
@@ -1193,23 +1194,58 @@ function saveTheatreQR() {
     alert('Theatre payment QR updated successfully.');
 }
 
-function handleAdminLogin(e) {
+async function handleAdminLogin(e) {
     e.preventDefault();
-    const username = document.getElementById('adminUsername').value;
+    const email = document.getElementById('adminUsername').value; // Use email for Firebase Auth
     const password = document.getElementById('adminPassword').value;
-    // Authenticate against stored admin users
-    const found = adminUsers.find(u => u.username === username && u.password === password);
-    if (found) {
-        // Store current admin session
-        currentAdmin = { username: found.username, isSuper: !!found.isSuper };
-        // persist session so reloads keep the logged-in admin
-        try { localStorage.setItem('currentAdmin', JSON.stringify(currentAdmin)); } catch (err) { console.warn('Failed to persist currentAdmin', err); }
+
+    if (!auth) {
+        alert('Firebase Auth not initialized. Please ensure Firebase config is saved and page reloaded.');
+        return;
+    }
+
+    try {
+        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+        console.log('Firebase user logged in:', user);
+
+        // Fetch admin roles from Firestore using UID
+        const adminRoleDoc = await firestore.collection('admin-roles').doc(user.uid).get();
+        let isAdmin = false;
+        let isSuper = false;
+
+        if (adminRoleDoc.exists) {
+            const roleData = adminRoleDoc.data();
+            isAdmin = true;
+            isSuper = roleData.isSuper || false;
+        } else {
+            // If no role doc, default to not admin or super. For initial setup, we might auto-grant
+            // For simplicity, let's assume a user must have an entry in 'admin-roles' to be considered admin
+            alert('No admin role found for this user. Please ensure an admin role is set in Firestore.');
+            await auth.signOut(); // Sign out user if no role found
+            return;
+        }
+
+        currentAdmin = { uid: user.uid, email: user.email, isSuper: isSuper };
+        localStorage.setItem('currentAdmin', JSON.stringify(currentAdmin));
+        
         closeAdminLogin();
         renderCurrentAdmin();
         updateManageQRButton();
         showAdminDashboard();
-    } else {
-        alert('Invalid username or password');
+        alert(`Logged in as admin: ${user.email}${isSuper ? ' (Super Admin)' : ''}`);
+
+    } catch (error) {
+        console.error('Firebase Admin Login Error:', error);
+        let errorMessage = 'Invalid username or password.';
+        if (error.code === 'auth/user-not-found') {
+            errorMessage = 'No account found with that email.';
+        } else if (error.code === 'auth/wrong-password') {
+            errorMessage = 'Incorrect password.';
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = 'Invalid email format.';
+        }
+        alert(errorMessage);
     }
 }
 
@@ -1226,7 +1262,15 @@ function logoutAdmin() {
     document.getElementById('adminLoginForm').reset();
     currentAdmin = null;
     // remove persisted session
-    try { localStorage.removeItem('currentAdmin'); } catch (err) { console.warn('Failed to remove currentAdmin from storage', err); }
+    try {
+        localStorage.removeItem('currentAdmin');
+        if (auth) {
+            auth.signOut();
+            console.log('Firebase user signed out.');
+        }
+    } catch (err) {
+        console.warn('Failed to remove currentAdmin from storage or sign out Firebase', err);
+    }
     renderCurrentAdmin();
     updateManageQRButton();
 }
@@ -1545,23 +1589,50 @@ function renderAdminUsers() {
     });
 }
 
-function handleAddAdminUser(e) {
+async function handleAddAdminUser(e) {
     e.preventDefault();
-    const username = document.getElementById('newAdminUsername').value.trim();
+    const email = document.getElementById('newAdminUsername').value.trim(); // Use email
     const password = document.getElementById('newAdminPassword').value;
-    if (!username || !password) {
-        alert('Please provide username and password');
+
+    if (!email || !password) {
+        alert('Please provide email and password.');
         return;
     }
-    if (adminUsers.find(u => u.username === username)) {
-        alert('An admin with this username already exists');
+
+    if (!auth || !firestore) {
+        alert('Firebase Auth or Firestore not initialized.');
         return;
     }
-    adminUsers.push({ username, password });
-    saveAdminUsers();
-    renderAdminUsers();
-    document.getElementById('adminUserForm').reset();
-    alert('Admin user added successfully');
+
+    try {
+        // 1. Create user in Firebase Authentication
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+        console.log('Firebase user created:', user);
+
+        // 2. Store user role in Firestore (default to not super admin)
+        await firestore.collection('admin-roles').doc(user.uid).set({
+            email: user.email,
+            isSuper: false // New admins are not super by default
+        });
+        console.log('Admin role saved to Firestore for UID:', user.uid);
+
+        renderAdminUsers(); // Re-render the list of admins (will fetch from Firestore)
+        document.getElementById('adminUserForm').reset();
+        alert(`Admin user ${email} added successfully! (Default role: not Super Admin)`);
+
+    } catch (error) {
+        console.error('Error adding admin user:', error);
+        let errorMessage = 'Failed to add admin user.';
+        if (error.code === 'auth/email-already-in-use') {
+            errorMessage = 'The email address is already in use by another account.';
+        } else if (error.code === 'auth/invalid-email') {
+            errorMessage = 'The email address is not valid.';
+        } else if (error.code === 'auth/weak-password') {
+            errorMessage = 'The password is too weak. Please use at least 6 characters.';
+        }
+        alert(errorMessage);
+    }
 }
 
 function deleteAdminUser(username) {
