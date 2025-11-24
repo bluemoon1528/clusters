@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Clusters Theatre - Book Your Show</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="logo">
+                <div class="logo-icon">
+                    <svg width="50" height="50" viewBox="0 0 50 50" xmlns="http://www.w3.org/2000/svg">
+                        <!-- Dark Blue C Shape -->
+                        <path d="M25 10 C18 10 12 16 12 25 C12 34 18 40 25 40" fill="none" stroke="#1a237e" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+                        <!-- Red Arrow inside C -->
+                        <path d="M20 25 L30 25 M27 20 L30 25 L27 30" stroke="#e50914" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+                    </svg>
+                </div>
+                <span>Clusters Theatre</span>
+            </div>
+            <button class="mobile-menu-toggle" onclick="toggleMobileMenu()" aria-label="Toggle menu">
+                <i class="fas fa-bars"></i>
+            </button>
+            <ul class="nav-menu" id="navMenu">
+                <li><a href="#home" onclick="closeMobileMenu()">Home</a></li>
+                <li><a href="#shows" onclick="closeMobileMenu()">Shows</a></li>
+                <li><a href="#rules" onclick="closeMobileMenu()">Rules</a></li>
+                <li><a href="#contact" onclick="closeMobileMenu()">Contact</a></li>
+                <li><a href="#" id="adminLink" onclick="closeMobileMenu()">Admin</a></li>
+                <li><a href="#" onclick="openFirebaseModal(); closeMobileMenu();">Firebase Settings</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Firebase Configuration Modal -->
+    <div id="firebaseModal" class="modal">
+        <div class="modal-content">
+            <span class="close-button" onclick="closeFirebaseModal()">&times;</span>
+            <h2>Firebase Configuration</h2>
+            <p>Paste your Firebase project's configuration JSON here. You can find this in your Firebase project settings under "Project settings" > "Your apps" > "Config".</p>
+            <textarea id="firebaseConfigInput" placeholder="Paste Firebase config JSON here..." rows="10"></textarea>
+            <p id="firebaseStatus" style="font-style: italic;"></p>
+            <div class="modal-actions">
+                <button class="btn-primary" onclick="saveFirebaseConfigFromInput()">Save Config</button>
+                <button class="btn-secondary" onclick="initFirebaseIfConfigured(); enableFirestoreSync();">Enable Sync</button>
+                <button class="btn-secondary" onclick="disableFirestoreSync()">Disable Sync</button>
+                <button class="btn-secondary" onclick="pushBookingsToFirestore()">Push Local to Cloud</button>
+                <button class="btn-secondary" onclick="pullBookingsFromFirestore()">Pull Cloud to Local</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Hero Section -->
+    <section id="home" class="hero">
+        <div class="hero-content">
+            <h1 class="hero-title" data-text="Clusters Theatre">Clusters Theatre</h1>
+            <p class="hero-subtitle">Experience Cinema Like Never Before</p>
+            <div class="hero-buttons">
+                <button class="btn-primary" onclick="scrollToShows()">Book Now</button>
+            </div>
+        </div>
+        <div class="floating-elements">
+            <div class="floating-circle"></div>
+            <div class="floating-circle"></div>
+            <div class="floating-circle"></div>
+        </div>
+    </section>
+
+    <!-- Shows Section -->
+    <section id="shows" class="shows-section">
+        <div class="container">
+            <h2 class="section-title">Current Shows</h2>
+            <div class="show-types">
+                <div class="show-type-card" data-type="film-club">
+                    <div class="card-icon"><i class="fas fa-users"></i></div>
+                    <h3>Film Club Shows</h3>
+                    <p class="price">₹150 per person</p>
+                    <p class="show-info"><i class="fas fa-info-circle"></i> Monthly - Only 2 Shows</p>
+                    <button class="btn-book" onclick="openBookingModal('film-club')">Book Now</button>
+                </div>
+                <div class="show-type-card" data-type="cluster">
+                    <div class="card-icon"><i class="fas fa-star"></i></div>
+                    <h3>Cluster Preview Movies</h3>
+                    <p class="price">₹4000 + 18% GST</p>
+                    <button class="btn-book" onclick="openBookingModal('cluster')">Book Now</button>
+                </div>
+            </div>
+
+            <div class="movies-grid" id="moviesGrid">
+                <!-- Movies will be dynamically loaded here -->
+            </div>
+            <div class="live-stats">
+                <h3>Live Ticket Sales: <span id="totalTicketsSold">0</span></h3>
+            </div>
+        </div>
+    </section>
+
+    <!-- Rules & Regulations -->
+    <section id="rules" class="rules-section">
+        <div class="container">
+            <h2 class="section-title">Rules & Regulations</h2>
+            <div class="rules-grid">
+                <div class="rule-card">
+                    <i class="fas fa-video"></i>
+                    <h3>Aspect Ratio</h3>
+                    <p>2:35:1 (Cinemascope)</p>
+                </div>
+                <div class="rule-card">
+                    <i class="fas fa-volume-up"></i>
+                    <h3>Audio Support</h3>
+                    <p>Upto Dolby 5.1 Surround</p>
+                </div>
+                <div class="rule-card">
+                    <i class="fas fa-chair"></i>
+                    <h3>Seat Capacity</h3>
+                    <p>43 Persons</p>
+                </div>
+                <div class="rule-card">
+                    <i class="fas fa-money-bill-wave"></i>
+                    <h3>Booking Policy</h3>
+                    <p>Cluster Preview Shows: 50% Advance Payment</p>
+                </div>
+                <div class="rule-card">
+                    <i class="fas fa-mobile-alt"></i>
+                    <h3>Payment Mode</h3>
+                    <p>Cash / GPay</p>
+                </div>
+                <div class="rule-card">
+                    <i class="fas fa-ruler"></i>
+                    <h3>Banner Size</h3>
+                    <p>8*4ft</p>
+                </div>
+                <div class="rule-card warning">
+                    <i class="fas fa-ban"></i>
+                    <h3>No Food or Beverages</h3>
+                    <p>Not allowed inside the theatre</p>
+                </div>
+                <div class="rule-card warning">
+                    <i class="fas fa-shoe-prints"></i>
+                    <h3>No Footwear</h3>
+                    <p>Not allowed inside the theatre</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact-section">
+        <div class="container">
+            <h2 class="section-title">Contact Us</h2>
+            <div class="contact-info">
+                <div class="contact-card">
+                    <i class="fas fa-phone"></i>
+                    <h3>Phone</h3>
+                    <p id="theatrePhone"><a href="tel:+916382881324">+91 6382881324</a></p>
+                </div>
+                <div class="contact-card">
+                    <i class="fas fa-envelope"></i>
+                    <h3>Email</h3>
+                    <p><a href="mailto:clusterstheatre@gmail.com">clusterstheatre@gmail.com</a></p>
+                </div>
+                <div class="contact-card">
+                    <i class="fas fa-map-marker-alt"></i>
+                    <h3>Address</h3>
+                    <p>439, Kamarajar Rd, Near Hope College,<br>Chitra Nagar, Hope College,<br>Coimbatore, Tamil Nadu 641004, India</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Booking Modal -->
+    <div id="bookingModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeBookingModal()">&times;</span>
+            <h2 id="modalTitle">Book Your Show</h2>
+            <form id="bookingForm">
+                <div class="form-group">
+                    <label>Movie</label>
+                    <select id="movieSelect" required>
+                        <option value="">Select a movie</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Show Type</label>
+                    <input type="text" id="showType" readonly>
+                </div>
+                <div class="form-group">
+                    <label>Date</label>
+                    <input type="date" id="showDate" required>
+                </div>
+                <div class="form-group">
+                    <label>Time</label>
+                    <input type="time" id="showTime" required>
+                </div>
+                <div class="form-group">
+                    <label>Number of Tickets</label>
+                    <input type="number" id="ticketCount" min="1" max="43" required>
+                </div>
+                <div class="form-group">
+                    <label>Name</label>
+                    <input type="text" id="customerName" required>
+                </div>
+                <div class="form-group">
+                    <label>Phone Number</label>
+                    <input type="tel" id="customerPhone" required>
+                </div>
+                <div class="form-group">
+                    <label>Email</label>
+                    <input type="email" id="customerEmail" required>
+                </div>
+                <div class="price-summary">
+                    <div class="price-row">
+                        <span>Base Price:</span>
+                        <span id="basePrice">₹0</span>
+                    </div>
+                    <div class="price-row" id="gstRow" style="display: none;">
+                        <span>GST (18%):</span>
+                        <span id="gstAmount">₹0</span>
+                    </div>
+                    <div class="price-row total">
+                        <span>Total:</span>
+                        <span id="totalPrice">₹0</span>
+                    </div>
+                </div>
+                <div class="payment-section">
+                    <h3>Payment QR Code</h3>
+                    <div class="qr-code">
+                        <img id="bookingModalQRImg" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=GPay:6382881324" alt="Payment QR">
+                        <p>Scan to pay via GPay</p>
+                    </div>
+                </div>
+                <button type="submit" class="btn-submit">Confirm Booking</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Ticket Modal -->
+    <div id="ticketModal" class="modal">
+        <div class="modal-content ticket-content">
+            <div class="ticket" id="ticketContent">
+                <div class="ticket-header">
+                    <div class="ticket-poster" id="ticketPoster"></div>
+                    <div class="ticket-info">
+                        <h2 id="ticketMovieName"></h2>
+                        <p class="ticket-type" id="ticketShowType"></p>
+                    </div>
+                </div>
+                <div class="ticket-details">
+                    <div class="detail-row">
+                        <span>Date:</span>
+                        <span id="ticketDate"></span>
+                    </div>
+                    <div class="detail-row">
+                        <span>Time:</span>
+                        <span id="ticketTime"></span>
+                    </div>
+                    <div class="detail-row">
+                        <span>Name:</span>
+                        <span id="ticketName"></span>
+                    </div>
+                    <div class="detail-row">
+                        <span>Phone:</span>
+                        <span id="ticketPhone"></span>
+                    </div>
+                    <div class="detail-row">
+                        <span>Tickets:</span>
+                        <span id="ticketCountDisplay"></span>
+                    </div>
+                    <div class="detail-row">
+                        <span>Amount:</span>
+                        <span id="ticketAmount"></span>
+                    </div>
+                    <div class="detail-row">
+                        <span>Ticket ID:</span>
+                        <span id="ticketId"></span>
+                    </div>
+                </div>
+                <div class="ticket-rules" id="ticketRules">
+                    <h4>Rules & Regulations</h4>
+                    <ul>
+                        <li>Seat Capacity: 43 Persons</li>
+                        <li>Aspect Ratio: 2:35:1 (Cinemascope)</li>
+                        <li>Audio: Dolby 5.1 Surround</li>
+                        <li>No Food or Beverages allowed</li>
+                        <li>Footwear not allowed inside</li>
+                        <li>Arrive 15 minutes before show time</li>
+                        <li>Present this ticket at entrance</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="ticket-actions">
+                <button onclick="printTicket()" class="btn-print"><i class="fas fa-print"></i> Print Ticket</button>
+                <button onclick="sendEmailConfirmation()" class="btn-email"><i class="fas fa-envelope"></i> Send Ticket via Email</button>
+                <button onclick="downloadTicketJPG()" class="btn-download"><i class="fas fa-download"></i> Download JPG</button>
+                <button onclick="closeTicketModal()" class="btn-close">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Login Modal -->
+    <div id="adminLoginModal" class="modal">
+        <div class="modal-content admin-login">
+            <span class="close" onclick="closeAdminLogin()">&times;</span>
+            <h2>Admin Login</h2>
+            <form id="adminLoginForm">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="adminUsername" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="adminPassword" required>
+                </div>
+                <button type="submit" class="btn-submit">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="adminDashboard" class="admin-dashboard" style="display: none;">
+        <div class="admin-header">
+            <h2>Admin Dashboard</h2>
+            <div style="display:flex;align-items:center;gap:12px;">
+                <div id="currentAdminDisplay" style="font-weight:600;color:#333;"></div>
+                <button onclick="logoutAdmin()" class="btn-logout">Logout</button>
+                <button id="forceLoginBtn" onclick="forceLoginGuhan()" class="btn-action" style="display:none;margin-left:8px;">Force login as guhan</button>
+            </div>
+        </div>
+        <div class="admin-content">
+            <div class="admin-stats">
+                <div class="stat-card">
+                    <h3>Total Bookings</h3>
+                    <p id="totalBookings">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Film Club Shows</h3>
+                    <p id="filmClubBookings">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Cluster Preview</h3>
+                    <p id="clusterBookings">0</p>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Revenue</h3>
+                    <p id="totalRevenue">₹0</p>
+                </div>
+            </div>
+            <div class="admin-tabs">
+                <button class="tab-btn active" onclick="switchAdminTab('bookings')">Bookings</button>
+                <button class="tab-btn" onclick="switchAdminTab('movies')">Manage Movies</button>
+                <button class="tab-btn" onclick="switchAdminTab('admins')">Admins</button>
+            </div>
+            <div id="bookingsTab" class="admin-tab-content">
+                <div class="admin-actions">
+                    <button onclick="generateStatement()" class="btn-action"><i class="fas fa-file-alt"></i> Generate Statement</button>
+                    <button onclick="downloadStatement()" class="btn-action"><i class="fas fa-download"></i> Download Statement</button>
+                    <button onclick="printStatement()" class="btn-action"><i class="fas fa-print"></i> Print Statement</button>
+                    <button onclick="clearAllBookings()" class="btn-action btn-clear"><i class="fas fa-trash-alt"></i> Clear All Bookings</button>
+                    <button id="manageQRBtn" onclick="openManageQRModal()" class="btn-action" style="display:none;"><i class="fas fa-qrcode"></i> Manage Payment QR</button>
+                </div>
+                <div class="bookings-table">
+                    <h3>Booking Details</h3>
+                    <table id="bookingsTable">
+                        <thead>
+                            <tr>
+                                <th>Ticket ID</th>
+                                <th>Movie</th>
+                                <th>Type</th>
+                                <th>Date</th>
+                                <th>Time</th>
+                                <th>Name</th>
+                                <th>Phone</th>
+                                <th>Tickets</th>
+                                <th>Amount</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bookingsTableBody">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            <div id="moviesTab" class="admin-tab-content" style="display: none;">
+                <div class="movie-management">
+                    <div class="add-movie-section">
+                        <h3>Add New Movie</h3>
+                        <form id="movieForm" onsubmit="handleMovieSubmit(event)">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="addMovieName">Movie Name</label>
+                                    <input type="text" id="addMovieName" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="addMoviePhone">Phone Number</label>
+                                    <input type="tel" id="addMoviePhone" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="addMoviePosterFile">Poster Image (JPG)</label>
+                                    <input type="file" id="addMoviePosterFile" accept="image/jpeg,image/jpg">
+                                    <input type="hidden" id="addMoviePoster" value="">
+                                    <small>Upload a JPG/JPEG image file. The image will be stored locally.</small>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="addMovieDate">Show Date</label>
+                                    <input type="date" id="addMovieDate" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="addMovieTime">Show Time</label>
+                                    <input type="time" id="addMovieTime" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Preview</label>
+                                <div class="poster-preview" id="posterPreview">
+                                    <p>Poster preview will appear here</p>
+                                </div>
+                            </div>
+                            <input type="hidden" id="addMovieId" value="">
+                            <div class="form-actions">
+                                <button type="submit" class="btn-submit"><i class="fas fa-save"></i> Save Movie</button>
+                                <button type="button" onclick="resetMovieForm()" class="btn-cancel"><i class="fas fa-times"></i> Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="movies-list-section">
+                        <h3>Current Movies</h3>
+                        <div class="admin-movies-grid" id="adminMoviesGrid">
+                            <!-- Movies will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="adminsTab" class="admin-tab-content" style="display: none; padding: 1rem;">
+                <h3>Admin Users</h3>
+                <p>Manage administrator accounts that can access this dashboard. Passwords are stored locally (not secure for production).</p>
+                <div class="admin-user-form" style="margin-top: 1rem;">
+                    <form id="adminUserForm">
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <input type="text" id="newAdminUsername" placeholder="Username" required style="flex:1; padding:8px;">
+                            <input type="password" id="newAdminPassword" placeholder="Password" required style="flex:1; padding:8px;">
+                            <button type="submit" class="btn-submit">Add Admin</button>
+                        </div>
+                    </form>
+                </div>
+                <div class="admin-users-list" style="margin-top:1rem;">
+                    <h4>Existing Admins</h4>
+                    <div id="adminUsersList" style="display:flex; flex-direction:column; gap:8px; margin-top:8px;"></div>
+                </div>
+            </div>
+            <div class="bookings-table">
+                <h3>Booking Details</h3>
+                <table id="bookingsTable">
+                    <thead>
+                        <tr>
+                            <th>Ticket ID</th>
+                            <th>Movie</th>
+                            <th>Type</th>
+                            <th>Date</th>
+                            <th>Time</th>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Tickets</th>
+                            <th>Amount</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bookingsTableBody">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manage Payment QR Modal (Admin only) -->
+    <div id="manageQRModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeManageQRModal()">&times;</span>
+            <h2>Manage Payment QR</h2>
+            <p>Only super admin users can change the theatre payment QR code.</p>
+            <div id="manageQRCurrentAdmin" style="margin-top:8px;font-weight:600;color:#333;"></div>
+            <div style="margin-top:12px;">
+                <label>Upload QR Image (JPG only):</label>
+                <input type="file" id="manageQRFile" accept="image/jpeg,image/jpg">
+                <div id="manageQRPreview" style="margin-top:12px;"></div>
+                <div id="manageQRError" style="color:red; margin-top:8px;"></div>
+                <small>Only JPG/JPEG images are allowed. The uploaded image will be saved and used as the theatre payment QR.</small>
+            </div>
+            <div style="margin-top:16px; display:flex; gap:8px;">
+                <button class="btn-submit" onclick="saveTheatreQR()">Save QR</button>
+                <button class="btn-cancel" onclick="closeManageQRModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2024 Clusters Theatre. All rights reserved.</p>
+    </footer>
+
+    <!-- Firebase (compat) - required for Firestore sync -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-firestore-compat.js"></script>
+    <script src="script.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</body>
+</html>
+
