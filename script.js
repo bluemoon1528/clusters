@@ -344,7 +344,19 @@ function loadMovies() {
 
 // Select movie
 function selectMovie(movie) {
-    document.getElementById('movieSelect').value = movie.id;
+    console.log('selectMovie called with movie:', movie);
+    if (!movie || !movie.id) {
+        console.error('Invalid movie object passed to selectMovie:', movie);
+        alert('Could not select movie. Please try again.');
+        return;
+    }
+    const movieSelect = document.getElementById('movieSelect');
+    if (movieSelect) {
+        movieSelect.value = movie.id;
+        console.log('Set movieSelect value to:', movie.id);
+    } else {
+        console.error('movieSelect element not found.');
+    }
     openBookingModal(currentBookingType || 'film-club');
 }
 
@@ -379,12 +391,14 @@ function setupEventListeners() {
 function updateTheatrePhone() {
     const phoneElement = document.getElementById('theatrePhone');
     if (phoneElement) {
-        phoneElement.textContent = movies[0]?.phone || '+91 6382881324';
+        // Ensure movies array has data before trying to access it
+        phoneElement.textContent = movies.length > 0 ? movies[0].phone : '+91 6382881324';
     }
 }
 
 // Open booking modal
 function openBookingModal(type) {
+    console.log('openBookingModal called with type:', type);
     currentBookingType = type;
     const modal = document.getElementById('bookingModal');
     const showTypeInput = document.getElementById('showType');
@@ -392,12 +406,18 @@ function openBookingModal(type) {
     
     // Populate movie select
     movieSelect.innerHTML = '<option value="">Select a movie</option>';
-    movies.forEach(movie => {
-        const option = document.createElement('option');
-        option.value = movie.id;
-        option.textContent = movie.name;
-        movieSelect.appendChild(option);
-    });
+    if (movies.length === 0) {
+        console.warn('No movies available to populate movieSelect dropdown.');
+        movieSelect.innerHTML += '<option value="" disabled>No movies available</option>';
+    } else {
+        movies.forEach(movie => {
+            const option = document.createElement('option');
+            option.value = movie.id;
+            option.textContent = movie.name;
+            movieSelect.appendChild(option);
+        });
+        console.log('movieSelect populated with movies:', movies.map(m => m.name));
+    }
     
     // Set show type
     if (type === 'film-club') {
@@ -449,7 +469,7 @@ function calculatePrice() {
 async function handleBooking(e) {
     e.preventDefault();
     
-    const movieId = parseInt(document.getElementById('movieSelect').value);
+    const movieId = document.getElementById('movieSelect').value; // Removed parseInt()
     const movie = movies.find(m => m.id === movieId);
     
     if (!movie) {
