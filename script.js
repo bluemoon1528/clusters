@@ -556,12 +556,6 @@ function showTicket(booking) {
     }
     document.getElementById('ticketAmount').textContent = `₹${booking.total.toLocaleString()}`;
     document.getElementById('ticketId').textContent = booking.id;
-    // Show appropriate QR on the ticket: if booking has its own approved QR, use it; otherwise use theatreQR
-    const ticketQR = document.getElementById('ticketQR');
-    if (ticketQR) {
-        const useQR = booking && booking.qr && booking.approved ? booking.qr : theatreQR;
-        ticketQR.innerHTML = `<img src="${useQR}" alt="Payment QR" style="width:120px;height:120px;object-fit:contain;border:1px solid #ddd;padding:4px;">`;
-    }
     
     modal.style.display = 'block';
     
