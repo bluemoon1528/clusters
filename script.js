@@ -214,10 +214,7 @@ let currentAdmin = null;
 // Admin users stored in localStorage. Default admin kept for compatibility.
 let adminUsers = []; // Will now be managed by Firebase Auth
 
-// Default theatre QR and state
-const DEFAULT_QR = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=GPay:6382881324';
-let theatreQR = localStorage.getItem('theatreQR') || DEFAULT_QR;
-let manageQRPending = null; // for admin file uploads before saving
+
 
 
 
@@ -256,13 +253,6 @@ document.addEventListener('DOMContentLoaded', function() {
         posterFileInput.addEventListener('change', updatePosterPreview);
     }
 
-    // Apply theatre QR to booking modal QR img
-    const bookingQRImg = document.getElementById('bookingModalQRImg');
-    if (bookingQRImg) bookingQRImg.src = theatreQR;
-
-    // Manage QR file input (admin modal)
-    const manageQRFile = document.getElementById('manageQRFile');
-    if (manageQRFile) manageQRFile.addEventListener('change', handleManageQRFile);
     // Restore current admin session if present
     const storedAdmin = localStorage.getItem('currentAdmin');
     if (storedAdmin) {
@@ -292,8 +282,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     // Render current admin display if already logged in
     renderCurrentAdmin();
-    // Ensure Manage QR button visibility is correct on load
-    updateManageQRButton();
     console.timeEnd('DOMContentLoaded_total');
 });
 
@@ -556,12 +544,6 @@ function showTicket(booking) {
     }
     document.getElementById('ticketAmount').textContent = `₹${booking.total.toLocaleString()}`;
     document.getElementById('ticketId').textContent = booking.id;
-    // Show appropriate QR on the ticket: if booking has its own approved QR, use it; otherwise use theatreQR
-    const ticketQR = document.getElementById('ticketQR');
-    if (ticketQR) {
-        const useQR = booking && booking.qr && booking.approved ? booking.qr : theatreQR;
-        ticketQR.innerHTML = `<img src="${useQR}" alt="Payment QR" style="width:120px;height:120px;object-fit:contain;border:1px solid #ddd;padding:4px;">`;
-    }
     
     modal.style.display = 'block';
     
@@ -692,195 +674,7 @@ function closeAdminLogin() {
     document.getElementById('adminLoginForm').reset();
 }
 
-// Open Manage Payment QR modal (admin only)
-function openManageQRModal() {
-    console.log('openManageQRModal() currentAdmin=', currentAdmin, 'adminUsers=', adminUsers);
-    // if currentAdmin is not set in-memory, attempt to restore from localStorage
-    if (!currentAdmin) {
-        try {
-            const stored = localStorage.getItem('currentAdmin');
-            if (stored) currentAdmin = JSON.parse(stored);
-            console.log('Restored currentAdmin from storage:', currentAdmin);
-        } catch (err) {
-            console.warn('Failed to restore currentAdmin from storage', err);
-        }
-    }
-    if (!currentAdmin || !currentAdmin.isSuper) {
-        // show clearer inline message and log for diagnostics
-        const errorEl = document.getElementById('manageQRError');
-        if (errorEl) errorEl.textContent = 'Only super admin users can manage the payment QR. Please login as super admin.';
-        alert('Only super admin users can manage the payment QR.');
-        return;
-    }
-    const modal = document.getElementById('manageQRModal');
-    if (!modal) return alert('Manage QR modal not found');
-    // reset inputs
-    const urlInput = document.getElementById('manageQRUrl');
-    const preview = document.getElementById('manageQRPreview');
-    const fileInput = document.getElementById('manageQRFile');
-    if (urlInput) urlInput.value = '';
-    if (fileInput) fileInput.value = '';
-    manageQRPending = null;
-    if (preview) preview.innerHTML = `<img src="${theatreQR}" alt="Current QR" style="width:140px;height:140px;object-fit:contain;border:1px solid #ddd;padding:4px;">`;
-    // show the currently logged-in admin inside the modal
-    const mcur = document.getElementById('manageQRCurrentAdmin');
-    if (mcur) mcur.textContent = `Logged in as: ${currentAdmin.username}${currentAdmin.isSuper ? ' (Super Admin)' : ''}`;
-    modal.style.display = 'block';
-}
 
-// Update the admin header with current admin info (username/role)
-function renderCurrentAdmin() {
-    const el = document.getElementById('currentAdminDisplay');
-    if (!el) return;
-    if (currentAdmin) {
-        el.textContent = `${currentAdmin.username}${currentAdmin.isSuper ? ' (Super Admin)' : ''}`;
-        // if logged in, hide the force-login button
-        const forceBtn = document.getElementById('forceLoginBtn');
-        if (forceBtn) forceBtn.style.display = 'none';
-    } else {
-        el.textContent = '';
-        // if not logged in, show the force-login button to help testing
-        const forceBtn = document.getElementById('forceLoginBtn');
-        if (forceBtn) forceBtn.style.display = 'inline-block';
-    }
-}
-
-// Force login helper for testing — sets guhan as current admin and persists session
-function forceLoginGuhan() {
-    currentAdmin = { username: 'guhan', isSuper: true };
-    try { localStorage.setItem('currentAdmin', JSON.stringify(currentAdmin)); } catch (err) { console.warn('Failed to persist currentAdmin', err); }
-    renderCurrentAdmin();
-    updateManageQRButton();
-    showAdminDashboard();
-    console.log('Forced login as guhan (super admin) for testing');
-}
-
-// Show/hide Manage QR button based on currentAdmin role
-function updateManageQRButton() {
-    const btn = document.getElementById('manageQRBtn');
-    if (!btn) return;
-    if (currentAdmin && currentAdmin.isSuper) {
-        btn.style.display = 'inline-block';
-    } else {
-        btn.style.display = 'none';
-    }
-}
-
-function closeManageQRModal() {
-    const modal = document.getElementById('manageQRModal');
-    if (!modal) return;
-    modal.style.display = 'none';
-    manageQRPending = null;
-    const preview = document.getElementById('manageQRPreview');
-    if (preview) preview.innerHTML = '';
-}
-
-function handleManageQRFile(e) {
-    const file = e.target.files && e.target.files[0];
-    const preview = document.getElementById('manageQRPreview');
-    const errorEl = document.getElementById('manageQRError');
-    if (!file) {
-        manageQRPending = null;
-        if (preview) preview.innerHTML = '';
-        if (errorEl) errorEl.textContent = '';
-        return;
-    }
-    // Only accept JPG/JPEG images and check file size (200 KB max)
-    const isJpg = file.type === 'image/jpeg' || file.type === 'image/jpg' || /\.jpe?g$/i.test(file.name);
-    const maxSize = 200 * 1024; // 200 KB
-    if (!isJpg) {
-        const msg = 'Only JPG/JPEG images are allowed. Please choose a .jpg or .jpeg file.';
-        console.warn(msg, file.type, file.name);
-        e.target.value = '';
-        manageQRPending = null;
-        if (preview) preview.innerHTML = '';
-        if (errorEl) errorEl.textContent = msg;
-        return;
-    }
-    if (file.size > maxSize) {
-        const msg = `File is too large (${Math.round(file.size/1024)}KB). Max allowed size is ${Math.round(maxSize/1024)}KB.`;
-        console.warn(msg);
-        e.target.value = '';
-        manageQRPending = null;
-        if (preview) preview.innerHTML = '';
-        if (errorEl) errorEl.textContent = msg;
-        return;
-    }
-    const reader = new FileReader();
-    reader.onload = function(evt) {
-        manageQRPending = evt.target.result; // data URL
-        if (preview) preview.innerHTML = `<img src="${manageQRPending}" alt="QR Preview" style="width:140px;height:140px;object-fit:contain;border:1px solid #ddd;padding:4px;">`;
-        if (errorEl) errorEl.textContent = '';
-        console.log('Manage QR file loaded, size:', manageQRPending.length);
-    };
-    reader.readAsDataURL(file);
-}
-
-// Save theatre QR (from file upload or URL). Restricted to super admin in UI.
-function saveTheatreQR() {
-    console.log('saveTheatreQR() called. currentAdmin=', currentAdmin, 'manageQRPending=', !!manageQRPending);
-    // Attempt to restore session from storage if currentAdmin is null
-    if (!currentAdmin) {
-        try {
-            const stored = localStorage.getItem('currentAdmin');
-            if (stored) {
-                currentAdmin = JSON.parse(stored);
-                console.log('Restored currentAdmin in saveTheatreQR:', currentAdmin);
-            }
-        } catch (err) {
-            console.warn('Failed to restore currentAdmin in saveTheatreQR', err);
-        }
-    }
-    const errorEl = document.getElementById('manageQRError');
-    if (!currentAdmin || !currentAdmin.isSuper) {
-        // If we don't have an in-memory session, allow a one-time password confirmation for super admin
-        const guhan = adminUsers.find(u => u.username === 'guhan');
-        if (guhan) {
-            const pw = prompt('Enter super admin (guhan) password to confirm change:');
-            if (pw === null) {
-                if (errorEl) errorEl.textContent = 'Operation cancelled';
-                alert('Operation cancelled');
-                return;
-            }
-            if (pw === guhan.password) {
-                // grant temporary session and persist it
-                currentAdmin = { username: guhan.username, isSuper: true };
-                try { localStorage.setItem('currentAdmin', JSON.stringify(currentAdmin)); } catch (err) { console.warn('Failed to persist currentAdmin', err); }
-                renderCurrentAdmin();
-                updateManageQRButton();
-                console.log('One-time super admin confirmation succeeded; proceeding with save.');
-            } else {
-                const msg = 'Incorrect super admin password. Only super admin users can change the payment QR.';
-                if (errorEl) errorEl.textContent = msg;
-                console.warn('saveTheatreQR blocked: incorrect super admin password');
-                alert(msg);
-                return;
-            }
-        } else {
-            const msg = 'Only super admin users can change the payment QR.';
-            if (errorEl) errorEl.textContent = msg;
-            console.warn('saveTheatreQR blocked: not super admin', { currentAdmin, adminUsers });
-            alert(msg);
-            return;
-        }
-    }
-    // Enforce manual JPG upload only
-    if (!manageQRPending) {
-        const msg = 'Please upload a JPG image for the payment QR before saving.';
-        if (errorEl) errorEl.textContent = msg;
-        alert(msg);
-        console.warn('saveTheatreQR aborted: no manageQRPending');
-        return;
-    }
-    const newQR = manageQRPending;
-    theatreQR = newQR;
-    localStorage.setItem('theatreQR', theatreQR);
-    // Update booking modal QR image
-    const bookingQRImg = document.getElementById('bookingModalQRImg');
-    if (bookingQRImg) bookingQRImg.src = theatreQR;
-    closeManageQRModal();
-    alert('Theatre payment QR updated successfully.');
-}
 
 async function handleAdminLogin(e) {
     e.preventDefault();
