@@ -220,7 +220,13 @@
                         <span id="totalPrice">₹0</span>
                     </div>
                 </div>
-
+                <div class="payment-section">
+                    <h3>Payment QR Code</h3>
+                    <div class="qr-code">
+                        <img id="bookingModalQRImg" src="https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=GPay:6382881324" alt="Payment QR">
+                        <p>Scan to pay via GPay</p>
+                    </div>
+                </div>
                 <button type="submit" class="btn-submit">Confirm Booking</button>
             </form>
         </div>
@@ -347,6 +353,7 @@
                     <button onclick="downloadStatement()" class="btn-action"><i class="fas fa-download"></i> Download Statement</button>
                     <button onclick="printStatement()" class="btn-action"><i class="fas fa-print"></i> Print Statement</button>
                     <button onclick="clearAllBookings()" class="btn-action btn-clear"><i class="fas fa-trash-alt"></i> Clear All Bookings</button>
+                    <button id="manageQRBtn" onclick="openManageQRModal()" class="btn-action" style="display:none;"><i class="fas fa-qrcode"></i> Manage Payment QR</button>
                 </div>
                 <div class="bookings-table">
                     <h3>Booking Details</h3>
@@ -463,7 +470,26 @@
         </div>
     </div>
 
-
+    <!-- Manage Payment QR Modal (Admin only) -->
+    <div id="manageQRModal" class="modal" style="display:none;">
+        <div class="modal-content">
+            <span class="close" onclick="closeManageQRModal()">&times;</span>
+            <h2>Manage Payment QR</h2>
+            <p>Only super admin users can change the theatre payment QR code.</p>
+            <div id="manageQRCurrentAdmin" style="margin-top:8px;font-weight:600;color:#333;"></div>
+            <div style="margin-top:12px;">
+                <label>Upload QR Image (JPG only):</label>
+                <input type="file" id="manageQRFile" accept="image/jpeg,image/jpg">
+                <div id="manageQRPreview" style="margin-top:12px;"></div>
+                <div id="manageQRError" style="color:red; margin-top:8px;"></div>
+                <small>Only JPG/JPEG images are allowed. The uploaded image will be saved and used as the theatre payment QR.</small>
+            </div>
+            <div style="margin-top:16px; display:flex; gap:8px;">
+                <button class="btn-submit" onclick="saveTheatreQR()">Save QR</button>
+                <button class="btn-cancel" onclick="closeManageQRModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
 
     <footer>
         <p>&copy; 2024 Clusters Theatre. All rights reserved.</p>
