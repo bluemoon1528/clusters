@@ -358,6 +358,7 @@ function setupEventListeners() {
     // Calculate price on change
     document.getElementById('ticketCount').addEventListener('input', calculatePrice);
     document.getElementById('showType').addEventListener('change', calculatePrice);
+    document.getElementById('movieSelect').addEventListener('change', updateDateTimeFromMovieSelection);
     
     // Update phone number
     updateTheatrePhone();
@@ -402,11 +403,9 @@ function openBookingModal(type) {
         showTypeInput.value = 'Cluster Preview Movie';
     }
     
-    // Set default date to today
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('showDate').value = today;
-    
     modal.style.display = 'block';
+    // Automatically set date and time if a movie is pre-selected
+    updateDateTimeFromMovieSelection();
     calculatePrice();
 }
 
@@ -414,6 +413,24 @@ function openBookingModal(type) {
 function closeBookingModal() {
     document.getElementById('bookingModal').style.display = 'none';
     document.getElementById('bookingForm').reset();
+}
+
+// Update date and time in the booking modal based on selected movie
+function updateDateTimeFromMovieSelection() {
+    const movieSelect = document.getElementById('movieSelect');
+    const showDateInput = document.getElementById('showDate');
+    const showTimeInput = document.getElementById('showTime');
+    
+    const selectedMovieId = movieSelect.value;
+    const selectedMovie = movies.find(m => m.id === selectedMovieId);
+
+    if (selectedMovie) {
+        showDateInput.value = selectedMovie.date;
+        showTimeInput.value = selectedMovie.time;
+    } else {
+        showDateInput.value = '';
+        showTimeInput.value = '';
+    }
 }
 
 // Calculate price
