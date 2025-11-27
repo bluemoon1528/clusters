@@ -358,7 +358,6 @@ function setupEventListeners() {
     // Calculate price on change
     document.getElementById('ticketCount').addEventListener('input', calculatePrice);
     document.getElementById('showType').addEventListener('change', calculatePrice);
-    document.getElementById('movieSelect').addEventListener('change', updateDateTimeFromMovieSelection);
     
     // Update phone number
     updateTheatrePhone();
@@ -403,9 +402,11 @@ function openBookingModal(type) {
         showTypeInput.value = 'Cluster Preview Movie';
     }
     
+    // Set default date to today
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('showDate').value = today;
+    
     modal.style.display = 'block';
-    // Automatically set date and time if a movie is pre-selected
-    updateDateTimeFromMovieSelection();
     calculatePrice();
 }
 
@@ -413,24 +414,6 @@ function openBookingModal(type) {
 function closeBookingModal() {
     document.getElementById('bookingModal').style.display = 'none';
     document.getElementById('bookingForm').reset();
-}
-
-// Update date and time in the booking modal based on selected movie
-function updateDateTimeFromMovieSelection() {
-    const movieSelect = document.getElementById('movieSelect');
-    const showDateInput = document.getElementById('showDate');
-    const showTimeInput = document.getElementById('showTime');
-    
-    const selectedMovieId = movieSelect.value;
-    const selectedMovie = movies.find(m => m.id === selectedMovieId);
-
-    if (selectedMovie) {
-        showDateInput.value = selectedMovie.date;
-        showTimeInput.value = selectedMovie.time;
-    } else {
-        showDateInput.value = '';
-        showTimeInput.value = '';
-    }
 }
 
 // Calculate price
@@ -556,6 +539,12 @@ function showTicket(booking) {
     }
     document.getElementById('ticketAmount').textContent = `₹${booking.total.toLocaleString()}`;
     document.getElementById('ticketId').textContent = booking.id;
+    // Show appropriate QR on the ticket: if booking has its own approved QR, use it; otherwise use theatreQR
+    const ticketQR = document.getElementById('ticketQR');
+    if (ticketQR) {
+        const useQR = booking && booking.qr && booking.approved ? booking.qr : theatreQR;
+        ticketQR.innerHTML = `<img src="${useQR}" alt="Payment QR" style="width:120px;height:120px;object-fit:contain;border:1px solid #ddd;padding:4px;">`;
+    }
     
     modal.style.display = 'block';
     
@@ -998,14 +987,6 @@ function loadBookingsTable() {
             delBtn.style.padding = '6px 10px';
             delBtn.onclick = function() { deleteBooking(booking.id); };
             actionsCell.appendChild(delBtn);
-
-            const printBtn = document.createElement('button');
-            printBtn.className = 'btn-action';
-            printBtn.textContent = 'Print';
-            printBtn.style.padding = '6px 10px';
-            printBtn.style.marginLeft = '5px';
-            printBtn.onclick = function() { showTicket(booking); }; // Re-use showTicket for printing
-            actionsCell.appendChild(printBtn);
             row.appendChild(actionsCell);
         }
 
