@@ -422,8 +422,12 @@ function openBookingModal(type) {
     // Set show type
     if (type === 'film-club') {
         showTypeInput.value = 'Film Club Show';
+        document.getElementById('gpayFilmClubMessage').style.display = 'block';
+        document.getElementById('generalGpayMessage').style.display = 'none';
     } else {
         showTypeInput.value = 'Cluster Preview Movie';
+        document.getElementById('gpayFilmClubMessage').style.display = 'none';
+        document.getElementById('generalGpayMessage').style.display = 'block';
     }
     
     modal.style.display = 'block';
