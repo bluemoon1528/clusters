@@ -358,9 +358,28 @@ function setupEventListeners() {
     // Calculate price on change
     document.getElementById('ticketCount').addEventListener('input', calculatePrice);
     document.getElementById('showType').addEventListener('change', calculatePrice);
+    document.getElementById('movieSelect').addEventListener('change', updateDateTimeFromMovieSelection);
     
     // Update phone number
     updateTheatrePhone();
+}
+
+// Update date and time in the booking modal based on selected movie
+function updateDateTimeFromMovieSelection() {
+    const movieSelect = document.getElementById('movieSelect');
+    const showDateInput = document.getElementById('showDate');
+    const showTimeInput = document.getElementById('showTime');
+    
+    const selectedMovieId = movieSelect.value;
+    const selectedMovie = movies.find(m => m.id === selectedMovieId);
+
+    if (selectedMovie) {
+        showDateInput.value = selectedMovie.date;
+        showTimeInput.value = selectedMovie.time;
+    } else {
+        showDateInput.value = '';
+        showTimeInput.value = '';
+    }
 }
 
 // Update theatre phone
@@ -392,6 +411,11 @@ function openBookingModal(type) {
             option.textContent = movie.name;
             movieSelect.appendChild(option);
         });
+        // If there are movies, try to pre-select the first one and update date/time
+        if (movies.length > 0) {
+            movieSelect.value = movies[0].id;
+            updateDateTimeFromMovieSelection();
+        }
         console.log('movieSelect populated with movies:', movies.map(m => m.name));
     }
     
@@ -402,11 +426,8 @@ function openBookingModal(type) {
         showTypeInput.value = 'Cluster Preview Movie';
     }
     
-    // Set default date to today
-    const today = new Date().toISOString().split('T')[0];
-    document.getElementById('showDate').value = today;
-    
     modal.style.display = 'block';
+    updateDateTimeFromMovieSelection(); // Call here to populate if a movie is already selected
     calculatePrice();
 }
 
@@ -472,7 +493,7 @@ async function handleBooking(e) {
         gst: showType === 'Cluster Preview Movie' ? 4000 * 0.18 : 0,
         // Remove all commas when parsing total price
         total: parseFloat(document.getElementById('totalPrice').textContent.replace('₹', '').replace(/,/g, '')),
-        bookingDate: new Date().toISOString()
+        bookingDate: `${movie.date} ${movie.time}`
     };
     
     bookings.push(booking);
