@@ -998,6 +998,14 @@ function loadBookingsTable() {
             delBtn.style.padding = '6px 10px';
             delBtn.onclick = function() { deleteBooking(booking.id); };
             actionsCell.appendChild(delBtn);
+
+            const printBtn = document.createElement('button');
+            printBtn.className = 'btn-action';
+            printBtn.textContent = 'Print';
+            printBtn.style.padding = '6px 10px';
+            printBtn.style.marginLeft = '5px';
+            printBtn.onclick = function() { showTicket(booking); }; // Re-use showTicket for printing
+            actionsCell.appendChild(printBtn);
             row.appendChild(actionsCell);
         }
 
